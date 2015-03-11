@@ -1,0 +1,162 @@
+<div class="main-page-title"><!-- start main page title -->
+	<div class="container">
+		<div class="post-resume-page-title">My Resume</div>		
+	</div>
+</div><!-- end main page title -->
+<?php if ($this->session->flashdata('message')):?>
+	<div class="alert alert-warning alert-dismissable job-alert alert-lightgreen">
+	<button type="button" class="close" data-dismiss="alert" aria-hidden="true"><i class="fa fa-times-circle"></i></button>
+	<?php echo $this->session->flashdata('message');?>
+</div>
+<?php endif;?>
+
+<?php if ($this->session->flashdata('error')):?>
+	<div class="alert alert-warning alert-dismissable job-alert alert-red">
+		<button type="button" class="close" data-dismiss="alert" aria-hidden="true"><i class="fa fa-times-circle"></i></button>
+		<?php echo $this->session->flashdata('error');?>
+	</div>
+<?php endif;?>
+
+<?php if (!empty($error)):?>
+	<div class="alert alert-warning alert-dismissable job-alert alert-red">
+		<button type="button" class="close" data-dismiss="alert" aria-hidden="true"><i class="fa fa-times-circle"></i></button>
+		<?php echo $error;?>
+	</div>
+<?php endif;?>
+
+<?php if (validation_errors()):?>
+	<div class="alert alert-warning alert-dismissable job-alert alert-red">
+		<button type="button" class="close" data-dismiss="alert" aria-hidden="true"><i class="fa fa-times-circle"></i></button>
+		<?php echo validation_errors();?>
+	</div>
+<?php endif;?>
+<div class="container">
+<div class="spacer-1">&nbsp;</div>
+	<div class="row">
+		<div class="col-md-8">
+			<form role="form" class="post-resume-form">
+				<div class="form-group">
+					<label for="name"><h5>Name:</h5> <?php echo $customer['firstname'].' '.$customer['lastname'] ?></label>					
+				</div>
+				<div class="form-group">
+					<label for="email"><h5>Email:</h5> <?php echo $customer['email'] ?></label>					
+				</div>	
+				<div class="form-group">
+					<label for="email"><h5>Contact:</h5> <?php echo $customer['phone'] ?></label>					
+				</div>	
+				
+				<div class="form-group">
+					<label><h5>Professional Skills:</h5></label>	
+					<?php if(!empty($skills)){
+						$skill_set = '';
+						for($i=0; $i<sizeof($skills);$i++){														
+							if($i == 0){								
+								$skill_set = $skills[$i]['title'];
+							}else{
+								$skill_set .= ', '.$skills[$i]['title'];
+							}																		
+						}
+					?>										
+					<p><?php echo $skill_set ?></p>
+											
+					<?php }else{ ?>
+						<label>Please enter your professional skills and qualifications (e.g. car repair, computer programming languages, etc.).</label>
+					<?php }?>
+					
+					<p><a href="<?php echo site_url('skill')?>" class="btn btn-default btn-red btn-sm">Click here to add a Skill</a></p>
+				</div>
+				
+				<div class="form-group">
+					<label><h5>Language:</h5></label>
+					<?php if(!empty($languages)){
+						$skill_set = '';
+						for($i=0; $i<sizeof($languages);$i++){														
+							if($i == 0){								
+								$skill_set = $languages[$i]['title'];
+							}else{
+								$skill_set .= ', '.$languages[$i]['title'];
+							}																		
+						}
+					?>										
+					<p><?php echo $skill_set ?></p>
+											
+					<?php }else{ ?>
+						<label>Please enter any languages you speak or write.</label>
+					<?php }?>
+					<p><a href="<?php echo site_url('language')?>" class="btn btn-default btn-red btn-sm">Click here to add a Language</a></p>
+				</div>
+				
+				<div class="form-group">
+					<label><h5>Experience:</h5></label>
+					<?php if(!empty($experiences)){
+						for($i=0; $i<sizeof($experiences);$i++){														
+					?>
+					
+						<p><?php echo $experiences[$i]['company'] ?> - <?php echo $experiences[$i]['position'] ?> <a href="<?php echo site_url('cart/experience/resume/'.$experiences[$i]['id'])?>"> Edit Experience</a></p>
+						<p><?php echo $experiences[$i]['location'] ?></p>
+						<p><?php echo $experiences[$i]['start_date'] ?> - <?php echo $experiences[$i]['end_date'] ?></p>
+					
+					<?php 																				
+						}
+					?>										
+																
+					<?php }else{ ?>					
+						<label>Experience matters. Add full or part-time employment, volunteering and community service experiences. Need help? Start with our samples available on our "add position" page.</label>					
+					<?php }?>
+					<p><a href="<?php echo site_url('experience')?>" class="btn btn-default btn-red btn-sm">Click here to add a Experience</a></p>
+				</div>	
+				
+				<div class="form-group">
+					<label><h5>Education:</h5></label>	
+					
+					<?php if(!empty($educations)){
+						for($i=0; $i<sizeof($educations);$i++){														
+					?>
+					
+						<p><?php echo $educations[$i]['school'] ?> - <?php echo $educations[$i]['major'] ?>, <?php echo $educations[$i]['gpa'] ?> <a href="<?php echo site_url('cart/education/resume/'.$educations[$i]['id'])?>"> Edit Education</a></p>
+						<p><?php echo $educations[$i]['location'] ?></p>
+						<p><?php echo $educations[$i]['start_date'] ?> - <?php echo $educations[$i]['end_date'] ?></p>
+					
+					<?php 																				
+						}
+					?>	
+						
+					<?php }else{ ?>	
+						<label>Employers are interested in your educational background.</label>
+					<?php }?>
+					<p><a href="<?php echo site_url('education')?>" class="btn btn-default btn-red btn-sm">Click here to add a Education</a></p>
+				</div>	
+				
+				<div class="form-group">
+					<label><h5>Document:</h5></label>	
+					<p></p>
+					<?php if(!empty($member) && isset($member['resume'])){																				
+					?>
+						<p><a href="<?php base_url('uploads/'.$member['resume'])?>"> <?php echo $member['resume'] ?></a></p>																				
+					<?php }else{ ?>	
+						<a href="<?php echo site_url('upload_resume')?>" class="btn btn-default btn-red btn-sm">Provide your document here.</a>
+					<?php }?>
+					
+				</div>	
+										
+									
+									
+							
+			</form>
+			<div class="spacer-2">&nbsp;</div>
+		</div>
+
+		<div class="col-md-4">
+			
+			<div class="job-side-wrap">
+				<h4>Post Your Resume</h4>
+				<p>
+					Upload your resume in PDF, Word or text format.
+				</p>
+				<p class="centering"><a href="<?php echo site_url('upload_resume')?>" class="btn btn-default btn-black">UPLOAD YOUR RESUME <i class="icon-upload white"></i></a></p>
+			</div>
+
+		</div>
+	</div>
+	
+</div>

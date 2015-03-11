@@ -1,0 +1,1244 @@
+<?php
+
+class Cart extends Front_Controller {
+
+	function index()
+	{
+		$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+		$data['homepage']			= true;
+		$data['all_jobs'] 			= $this->Customer_model->retrieve_jobs();
+		
+		$this->view('homepage', $data);
+	}
+
+	function page($id = false)
+	{
+		//if there is no page id provided redirect to the homepage.
+		$data['page']	= $this->Page_model->get_page($id);
+		if(!$data['page'])
+		{
+			show_404();
+		}
+		$this->load->model('Page_model');
+		$data['base_url']			= $this->uri->segment_array();
+		
+		$data['fb_like']			= true;
+
+		$data['page_title']			= $data['page']->title;
+		
+		$data['meta']				= $data['page']->meta;
+		$data['seo_title']			= (!empty($data['page']->seo_title))?$data['page']->seo_title:$data['page']->title;
+		
+		$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+		
+		$this->view('page', $data);
+	}
+	
+	
+	function search($code=false, $page = 0)
+	{
+		$this->load->model('Search_model');
+		
+		//check to see if we have a search term
+		if(!$code)
+		{
+			//if the term is in post, save it to the db and give me a reference
+			$term		= $this->input->post('term', true);
+			$code		= $this->Search_model->record_term($term);
+			
+			// no code? redirect so we can have the code in place for the sorting.
+			// I know this isn't the best way...
+			redirect('cart/search/'.$code.'/'.$page);
+		}
+		else
+		{
+			//if we have the md5 string, get the term
+			$term	= $this->Search_model->get_term($code);
+		}
+		
+		if(empty($term))
+		{
+			//if there is still no search term throw an error
+			$this->session->set_flashdata('error', lang('search_error'));
+			redirect('cart');
+		}
+
+		$data['page_title']			= lang('search');
+		$data['gift_cards_enabled']	= $this->gift_cards_enabled;
+		
+		//fix for the category view page.
+		$data['base_url']			= array();
+		
+		$sort_array = array(
+							'name/asc' => array('by' => 'name', 'sort'=>'ASC'),
+							'name/desc' => array('by' => 'name', 'sort'=>'DESC'),
+							'price/asc' => array('by' => 'sort_price', 'sort'=>'ASC'),
+							'price/desc' => array('by' => 'sort_price', 'sort'=>'DESC'),
+							);
+		$sort_by	= array('by'=>false, 'sort'=>false);
+	
+		if(isset($_GET['by']))
+		{
+			if(isset($sort_array[$_GET['by']]))
+			{
+				$sort_by	= $sort_array[$_GET['by']];
+			}
+		}
+		
+			$data['page_title']	= lang('search');
+			$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+		
+			//set up pagination
+			$this->load->library('pagination');
+			$config['base_url']		= base_url().'cart/search/'.$code.'/';
+			$config['uri_segment']	= 4;
+			$config['per_page']		= 20;
+			
+			$config['first_link'] = 'First';
+			$config['first_tag_open'] = '<li>';
+			$config['first_tag_close'] = '</li>';
+			$config['last_link'] = 'Last';
+			$config['last_tag_open'] = '<li>';
+			$config['last_tag_close'] = '</li>';
+
+			$config['full_tag_open'] = '<div class="pagination"><ul>';
+			$config['full_tag_close'] = '</ul></div>';
+			$config['cur_tag_open'] = '<li class="active"><a href="#">';
+			$config['cur_tag_close'] = '</a></li>';
+
+			$config['num_tag_open'] = '<li>';
+			$config['num_tag_close'] = '</li>';
+
+			$config['prev_link'] = '&laquo;';
+			$config['prev_tag_open'] = '<li>';
+			$config['prev_tag_close'] = '</li>';
+
+			$config['next_link'] = '&raquo;';
+			$config['next_tag_open'] = '<li>';
+			$config['next_tag_close'] = '</li>';
+			
+			$result					= $this->Product_model->search_products($term, $config['per_page'], $page, $sort_by['by'], $sort_by['sort']);
+			$config['total_rows']	= $result['count'];
+			$this->pagination->initialize($config);
+	
+			$data['products']		= $result['products'];
+			foreach ($data['products'] as &$p)
+			{
+				$p->images	= (array)json_decode($p->images);
+				$p->options	= $this->Option_model->get_product_options($p->id);
+			}
+			$this->view('category', $data);
+	}
+	
+
+	
+	function category($id)
+	{
+		
+		//get the category
+		$data['category'] = $this->Category_model->get_category($id);
+				
+		if (!$data['category'] || $data['category']->enabled==0)
+		{
+			show_404();
+		}
+				
+		$product_count = $this->Product_model->count_products($data['category']->id);
+		
+		//set up pagination
+		$segments	= $this->uri->total_segments();
+		$base_url	= $this->uri->segment_array();
+		
+		if($data['category']->slug == $base_url[count($base_url)])
+		{
+			$page	= 0;
+			$segments++;
+		}
+		else
+		{
+			$page	= array_splice($base_url, -1, 1);
+			$page	= $page[0];
+		}
+		
+		$data['base_url']	= $base_url;
+		$base_url			= implode('/', $base_url);
+		
+		$data['product_columns']	= $this->config->item('product_columns');
+		$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+		
+		$data['meta']		= $data['category']->meta;
+		$data['seo_title']	= (!empty($data['category']->seo_title))?$data['category']->seo_title:$data['category']->name;
+		$data['page_title']	= $data['category']->name;
+		
+		$sort_array = array(
+							'name/asc' => array('by' => 'products.name', 'sort'=>'ASC'),
+							'name/desc' => array('by' => 'products.name', 'sort'=>'DESC'),
+							'price/asc' => array('by' => 'sort_price', 'sort'=>'ASC'),
+							'price/desc' => array('by' => 'sort_price', 'sort'=>'DESC'),
+							);
+		$sort_by	= array('by'=>'sequence', 'sort'=>'ASC');
+	
+		if(isset($_GET['by']))
+		{
+			if(isset($sort_array[$_GET['by']]))
+			{
+				$sort_by	= $sort_array[$_GET['by']];
+			}
+		}
+		
+		//set up pagination
+		$this->load->library('pagination');
+		$config['base_url']		= site_url($base_url);
+		
+		$config['uri_segment']	= $segments;
+		$config['per_page']		= 24;
+		$config['total_rows']	= $product_count;
+		
+		$config['first_link'] = 'First';
+		$config['first_tag_open'] = '<li>';
+		$config['first_tag_close'] = '</li>';
+		$config['last_link'] = 'Last';
+		$config['last_tag_open'] = '<li>';
+		$config['last_tag_close'] = '</li>';
+
+		$config['full_tag_open'] = '<div class="pagination"><ul>';
+		$config['full_tag_close'] = '</ul></div>';
+		$config['cur_tag_open'] = '<li class="active"><a href="">';
+		$config['cur_tag_close'] = '</a></li>';
+		
+		$config['num_tag_open'] = '<li>';
+		$config['num_tag_close'] = '</li>';
+		
+		$config['prev_link'] = '&laquo;';
+		$config['prev_tag_open'] = '<li>';
+		$config['prev_tag_close'] = '</li>';
+
+		$config['next_link'] = '&raquo;';
+		$config['next_tag_open'] = '<li>';
+		$config['next_tag_close'] = '</li>';
+				
+		$this->pagination->initialize($config);
+		
+		
+		$data['products']	= $this->Product_model->get_products($data['category']->id, $config['per_page'], $page, $sort_by['by'], $sort_by['sort']);
+		
+		
+		foreach ($data['products'] as &$p)
+		{
+			$p->images	= (array)json_decode($p->images);
+			$p->options	= $this->Option_model->get_product_options($p->id);
+		}
+		
+		$this->view('category', $data);
+	}
+	
+	function product($id)
+	{
+		//get the product
+		$data['product']	= $this->Product_model->get_product($id);
+		
+		
+		if(!$data['product'] || $data['product']->enabled==0)
+		{
+			show_404();
+		}
+		
+		$data['base_url']			= $this->uri->segment_array();
+		
+		// load the digital language stuff
+		$this->lang->load('digital_product');
+		
+		$data['options']	= $this->Option_model->get_product_options($data['product']->id);
+		
+		$related			= $data['product']->related_products;
+		$data['related']	= array();
+		
+
+				
+		$data['posted_options']	= $this->session->flashdata('option_values');
+
+		$data['page_title']			= $data['product']->name;
+		$data['meta']				= $data['product']->meta;
+		$data['seo_title']			= (!empty($data['product']->seo_title))?$data['product']->seo_title:$data['product']->name;
+			
+		if($data['product']->images == 'false')
+		{
+			$data['product']->images = array();
+		}
+		else
+		{
+			$data['product']->images	= array_values((array)json_decode($data['product']->images));
+		}
+
+		$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+					
+		$this->view('product', $data);
+	}
+	
+	
+	function add_to_cart()
+	{
+		// Get our inputs
+		$product_id		= $this->input->post('id');
+		$quantity 		= $this->input->post('quantity');
+		$post_options 	= $this->input->post('option');
+		
+		// Get a cart-ready product array
+		$product = $this->Product_model->get_cart_ready_product($product_id, $quantity);
+		
+		//if out of stock purchase is disabled, check to make sure there is inventory to support the cart.
+		if(!$this->config->item('allow_os_purchase') && (bool)$product['track_stock'])
+		{
+			$stock	= $this->Product_model->get_product($product_id);
+			
+			//loop through the products in the cart and make sure we don't have this in there already. If we do get those quantities as well
+			$items		= $this->go_cart->contents();
+			$qty_count	= $quantity;
+			foreach($items as $item)
+			{
+				if(intval($item['id']) == intval($product_id))
+				{
+					$qty_count = $qty_count + $item['quantity'];
+				}
+			}
+			
+			if($stock->quantity < $qty_count)
+			{
+				//we don't have this much in stock
+				$this->session->set_flashdata('error', sprintf(lang('not_enough_stock'), $stock->name, $stock->quantity));
+				$this->session->set_flashdata('quantity', $quantity);
+				$this->session->set_flashdata('option_values', $post_options);
+
+				redirect($this->Product_model->get_slug($product_id));
+			}
+		}
+
+		// Validate Options 
+		// this returns a status array, with product item array automatically modified and options added
+		//  Warning: this method receives the product by reference
+		$status = $this->Option_model->validate_product_options($product, $post_options);
+		
+		// don't add the product if we are missing required option values
+		if( ! $status['validated'])
+		{
+			$this->session->set_flashdata('quantity', $quantity);
+			$this->session->set_flashdata('error', $status['message']);
+			$this->session->set_flashdata('option_values', $post_options);
+		
+			redirect($this->Product_model->get_slug($product_id));
+		
+		} else {
+		
+			//Add the original option vars to the array so we can edit it later
+			$product['post_options']	= $post_options;
+			
+			//is giftcard
+			$product['is_gc']			= false;
+			
+			// Add the product item to the cart, also updates coupon discounts automatically
+			$this->go_cart->insert($product);
+		
+			// go go gadget cart!
+			redirect('cart/view_cart');
+		}
+	}
+	
+	function view_cart()
+	{
+		
+		$data['page_title']	= 'View Cart';
+		$data['gift_cards_enabled'] = $this->gift_cards_enabled;
+		
+		$this->view('view_cart', $data);
+	}
+	
+	function remove_item($key)
+	{
+		//drop quantity to 0
+		$this->go_cart->update_cart(array($key=>0));
+		
+		redirect('cart/view_cart');
+	}
+	
+	function update_cart($redirect = false)
+	{
+		//if redirect isn't provided in the URL check for it in a form field
+		if(!$redirect)
+		{
+			$redirect = $this->input->post('redirect');
+		}
+		
+		// see if we have an update for the cart
+		$item_keys		= $this->input->post('cartkey');
+		$coupon_code	= $this->input->post('coupon_code');
+		$gc_code		= $this->input->post('gc_code');
+		
+		if($coupon_code)
+		{
+			$coupon_code = strtolower($coupon_code);
+		}
+			
+		//get the items in the cart and test their quantities
+		$items			= $this->go_cart->contents();
+		$new_key_list	= array();
+		//first find out if we're deleting any products
+		foreach($item_keys as $key=>$quantity)
+		{
+			if(intval($quantity) === 0)
+			{
+				//this item is being removed we can remove it before processing quantities.
+				//this will ensure that any items out of order will not throw errors based on the incorrect values of another item in the cart
+				$this->go_cart->update_cart(array($key=>$quantity));
+			}
+			else
+			{
+				//create a new list of relevant items
+				$new_key_list[$key]	= $quantity;
+			}
+		}
+		$response	= array();
+		foreach($new_key_list as $key=>$quantity)
+		{
+			$product	= $this->go_cart->item($key);
+			//if out of stock purchase is disabled, check to make sure there is inventory to support the cart.
+			if(!$this->config->item('allow_os_purchase') && (bool)$product['track_stock'])
+			{
+				$stock	= $this->Product_model->get_product($product['id']);
+			
+				//loop through the new quantities and tabluate any products with the same product id
+				$qty_count	= $quantity;
+				foreach($new_key_list as $item_key=>$item_quantity)
+				{
+					if($key != $item_key)
+					{
+						$item	= $this->go_cart->item($item_key);
+						//look for other instances of the same product (this can occur if they have different options) and tabulate the total quantity
+						if($item['id'] == $stock->id)
+						{
+							$qty_count = $qty_count + $item_quantity;
+						}
+					}
+				}
+				if($stock->quantity < $qty_count)
+				{
+					if(isset($response['error']))
+					{
+						$response['error'] .= '<p>'.sprintf(lang('not_enough_stock'), $stock->name, $stock->quantity).'</p>';
+					}
+					else
+					{
+						$response['error'] = '<p>'.sprintf(lang('not_enough_stock'), $stock->name, $stock->quantity).'</p>';
+					}
+				}
+				else
+				{
+					//this one works, we can update it!
+					//don't update the coupons yet
+					$this->go_cart->update_cart(array($key=>$quantity));
+				}
+			}
+			else
+			{
+				$this->go_cart->update_cart(array($key=>$quantity));
+			}
+		}
+		
+		//if we don't have a quantity error, run the update
+		if(!isset($response['error']))
+		{
+			//update the coupons and gift card code
+			$response = $this->go_cart->update_cart(false, $coupon_code, $gc_code);
+			// set any messages that need to be displayed
+		}
+		else
+		{
+			$response['error'] = '<p>'.lang('error_updating_cart').'</p>'.$response['error'];
+		}
+		
+		
+		//check for errors again, there could have been a new error from the update cart function
+		if(isset($response['error']))
+		{
+			$this->session->set_flashdata('error', $response['error']);
+		}
+		if(isset($response['message']))
+		{
+			$this->session->set_flashdata('message', $response['message']);
+		}
+		
+		if($redirect)
+		{
+			redirect($redirect);
+		}
+		else
+		{
+			redirect('cart/view_cart');
+		}
+	}
+
+	
+	/***********************************************************
+			Gift Cards
+			 - this function handles adding gift cards to the cart
+	***********************************************************/
+	
+	function giftcard()
+	{
+		if(!$this->gift_cards_enabled) redirect('/');
+		
+		// Load giftcard settings
+		$gc_settings = $this->Settings_model->get_settings("gift_cards");
+				
+		$this->load->library('form_validation');
+		
+		$data['allow_custom_amount']	= (bool) $gc_settings['allow_custom_amount'];
+		$data['preset_values']			= explode(",",$gc_settings['predefined_card_amounts']);
+		
+		if($data['allow_custom_amount'])
+		{
+			$this->form_validation->set_rules('custom_amount', 'lang:custom_amount', 'numeric');
+		}
+		
+		$this->form_validation->set_rules('amount', 'lang:amount', 'required');
+		$this->form_validation->set_rules('preset_amount', 'lang:preset_amount', 'numeric');
+		$this->form_validation->set_rules('gc_to_name', 'lang:recipient_name', 'trim|required');
+		$this->form_validation->set_rules('gc_to_email', 'lang:recipient_email', 'trim|required|valid_email');
+		$this->form_validation->set_rules('gc_from', 'lang:sender_email', 'trim|required');
+		$this->form_validation->set_rules('message', 'lang:custom_greeting', 'trim|required');
+		
+		if ($this->form_validation->run() == FALSE)
+		{
+			$data['error']				= validation_errors();
+			$data['page_title']			= lang('giftcard');
+			$data['gift_cards_enabled']	= $this->gift_cards_enabled;
+			$this->view('giftcards', $data);
+		}
+		else
+		{
+			
+			// add to cart
+			
+			$card['price'] = set_value(set_value('amount'));
+			
+			$card['id']				= -1; // just a placeholder
+			$card['sku']			= lang('giftcard');
+			$card['base_price']		= $card['price']; // price gets modified by options, show the baseline still...
+			$card['name']			= lang('giftcard');
+			$card['code']			= generate_code(); // from the string helper
+			$card['excerpt']		= sprintf(lang('giftcard_excerpt'), set_value('gc_to_name'));
+			$card['weight']			= 0;
+			$card['quantity']		= 1;
+			$card['shippable']		= false;
+			$card['taxable']		= 0;
+			$card['fixed_quantity'] = true;
+			$card['is_gc']			= true; // !Important
+			$card['track_stock']	= false; // !Imporortant
+			
+			$card['gc_info'] = array("to_name"	=> set_value('gc_to_name'),
+									 "to_email"	=> set_value('gc_to_email'),
+									 "from"		=> set_value('gc_from'),
+									 "personal_message"	=> set_value('message')
+									 );
+			
+			// add the card data like a product
+			$this->go_cart->insert($card);
+			
+			redirect('cart/view_cart');
+		}
+	}
+	function my_resume()
+	{
+		$data['my_resume']		= true;
+		$data['customer']		= $this->go_cart->customer();
+	
+		$data['member']			= (array)$this->Customer_model->get_member($this->go_cart->customer('id'));		
+		
+		$data['skills'] 			= $this->Customer_model->get_skills_by_customerid($this->go_cart->customer('id'));		
+		$data['languages']			= $this->Customer_model->get_languages_by_customerid($this->go_cart->customer('id'));
+		$data['experiences']			= $this->Customer_model->get_experiences_by_customerid($this->go_cart->customer('id'));
+				
+		$data['educations']			= $this->Customer_model->get_educations_by_customerid($this->go_cart->customer('id'));
+		
+		$this->view('my_resume', $data);
+	}
+	
+	function skill()
+	{
+		
+		$data['skill']			= true;
+		$data['customer']		= $this->go_cart->customer();
+		$this->load->library('form_validation');
+		
+		
+		$skill_ids = $this->input->post('skill_id');
+		$levels = $this->input->post('level');
+		$qty_field = $this->input->post('qty_field');
+		
+		//$this->form_validation->set_rules('skill_id[]', 'Skill', 'trim|required');				
+		/*validation for two text field*/	
+		// Begin with i = 1 because in HTML is start array with 1
+		for($i=1; $i<=sizeof($skill_ids); $i++){
+			$this->form_validation->set_rules("skill_id[$i]", 'Skill #'.$i);
+			$this->form_validation->set_rules("level[$i]" , 'Level #'.$i);			
+		}						
+		$this->form_validation->set_rules("qty_field" , 'Qty Field');
+		$data['skills'] 				= $this->Customer_model->get_skills_by_customerid($this->go_cart->customer('id'));		
+		
+		if ($this->form_validation->run() == FALSE)
+		{
+			$this->view('jobseeker_skill', $data);
+		}else{						
+			
+			//$skill_id								= $this->input->post('skill_id'); //get batch of skills 
+			//$level 									= $this->input->post('level'); // get batch of levels
+
+			//check the item in db is it already exist for this member
+			if(isset($data['skills'])){
+				//if existed, delete all first only save data
+				$this->Customer_model->delete_skills_by_customerid($this->go_cart->customer('id'));
+			}
+			
+			
+			$has_value_in_form = 0;			
+			// Begin with i=1 because in HTML is start array with 1
+			for($i=1; $i<= sizeof($skill_ids); $i++){
+				// then all insert into array - array -> array
+				if((isset($skill_ids[$i]) && !empty($skill_ids[$i])) && (isset($levels[$i]) && !empty($levels[$i])) ){
+					$skills[] = array(
+							'id_member'=>$this->go_cart->customer('id'),
+							'title' => $skill_ids[$i],
+							'level' => $levels[$i]
+					);
+					$has_value_in_form ++;
+				}				
+			}
+
+			if($has_value_in_form > 0){
+				$this->Customer_model->save_batch_skill($skills);
+			}											
+			
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+			
+			redirect('cart/my_resume');
+		}
+	
+		
+	}
+	
+	function language()
+	{
+	
+		$data['language']			= true;
+		$data['customer']		= $this->go_cart->customer();
+		$this->load->library('form_validation');
+	
+	
+		$language_ids = $this->input->post('language_id');
+		$levels = $this->input->post('level');
+		$qty_field = $this->input->post('qty_field');
+	
+		//$this->form_validation->set_rules('language_id[]', 'Language', 'trim|required');
+		/*validation for two text field*/
+		// Begin with i = 1 because in HTML is start array with 1
+		for($i=1; $i<=sizeof($language_ids); $i++){
+			$this->form_validation->set_rules("language_id[$i]", 'Language #'.$i);
+			$this->form_validation->set_rules("level[$i]" , 'Level #'.$i);
+		}
+		$this->form_validation->set_rules("qty_field" , 'Qty Field');
+		$data['languages'] 				= $this->Customer_model->get_languages_by_customerid($this->go_cart->customer('id'));
+	
+		if ($this->form_validation->run() == FALSE)
+		{
+			$this->view('jobseeker_language', $data);
+		}else{
+				
+			//$language_id								= $this->input->post('language_id'); //get batch of languages
+			//$level 									= $this->input->post('level'); // get batch of levels
+	
+			//check the item in db is it already exist for this member
+			if(isset($data['languages'])){
+				//if existed, delete all first only save data
+				$this->Customer_model->delete_languages_by_customerid($this->go_cart->customer('id'));
+			}
+				
+				
+			$has_value_in_form = 0;
+			// Begin with i=1 because in HTML is start array with 1
+			for($i=1; $i<= sizeof($language_ids); $i++){
+				// then all insert into array - array -> array
+				if((isset($language_ids[$i]) && !empty($language_ids[$i])) && (isset($levels[$i]) && !empty($levels[$i])) ){
+					$languages[] = array(
+							'id_member'=>$this->go_cart->customer('id'),
+							'title' => $language_ids[$i],
+							'rank' => $levels[$i]
+					);
+					$has_value_in_form ++;
+				}
+			}
+	
+			if($has_value_in_form > 0){
+				$this->Customer_model->save_batch_language($languages);
+			}
+				
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+				
+			redirect('cart/my_resume');
+		}
+		
+	}
+	
+	function experience($dummy_data = false, $experience_id = false)
+	{
+		if(!$experience_id){
+			$experience_id = $this->input->post('experience_id');
+		}
+		
+		
+		$data['experience']		= true;
+		$data['customer']		= $this->go_cart->customer();	
+		$data['id_country']		= '';
+		$data['id_state']		= '';	
+		$data['experience']		= '';
+		$data['countries_menu']	= $this->Location_model->get_countries_menu();
+		
+		$this->load->library('form_validation');
+		
+		$this->form_validation->set_rules("company", 'Company', 'trim|required');
+		$this->form_validation->set_rules("position" , 'Position', 'trim|required');
+		
+		$this->form_validation->set_rules("location" , 'Location', 'required');
+		$this->form_validation->set_rules("id_country" , 'Country', 'required');
+		
+		$this->form_validation->set_rules("start_month" , 'Start Month', 'required');
+		$this->form_validation->set_rules("start_year" , 'Start Year', 'required');
+		$this->form_validation->set_rules("end_month" , 'End Year', 'required');
+		$this->form_validation->set_rules("end_month" , 'End Year', 'required');
+		
+		$this->form_validation->set_rules("desc" , 'Description', 'required');
+		
+		if($experience_id){
+			$data['experience'] 				= $this->Customer_model->get_experience_by_id_and_cid($experience_id, $this->go_cart->customer('id'));
+		}
+		
+		//You need pass a ID to this page, so check as well ID with member ID, 
+		//if it is has a data in table. Let user do update
+		// if it is empty then just key in new.		
+		if ($this->form_validation->run() == FALSE)
+		{
+			$this->view('jobseeker_experience', $data);
+		}else{
+	
+			//$language_id								= $this->input->post('language_id'); //get batch of languages
+			//$level 									= $this->input->post('level'); // get batch of levels
+			$company = $this->input->post('company');
+			$position = $this->input->post('position');
+			$location = $this->input->post('location');
+			$id_country = $this->input->post('id_country');
+			
+			$start_month = $this->input->post('start_month');
+			$start_year = $this->input->post('start_year');			
+			$str_start_date = strtotime($start_month.$start_year);
+			$start_date = date("Y-m-d",$str_start_date);
+						
+			$end_month = $this->input->post('end_month');
+			$end_year = $this->input->post('end_year');
+			$str_end_date = strtotime($end_month.$end_year);
+			$end_date = date("Y-m-d",$str_end_date);						
+			
+			$desc = $this->input->post('desc');					
+			// Begin with i=1 because in HTML is start array with 1
+				// then all insert into array - array -> array				
+			
+			$exp['company']		= $company;
+			$exp['position']	= $position;			
+			$exp['id_member'] 	= $this->go_cart->customer('id');
+			$exp['location'] 	= $location;
+			$exp['id_country'] 	= $id_country;
+			$exp['start_date'] 	= $start_date;
+			$exp['end_date'] 	= $end_date;
+			$exp['desc'] 		= $desc;
+								
+			if(!empty($data['experience'])){				
+				$exp['id'] 	= $data['experience']->id;				
+			}
+				
+			$id = $this->Customer_model->save_experience($exp);			
+	
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+	
+			redirect('cart/my_resume');
+		}
+	
+	}
+	
+	function education($dummy_data = false, $education_id = false)
+	{					
+		if(!$education_id){
+			$education_id = $this->input->post('education_id');
+		}
+		
+		$data['education']		= true;
+		$data['customer']		= $this->go_cart->customer();
+		$data['id_country']		= '';		
+		$data['education']		= '';
+		$data['countries_menu']	= $this->Location_model->get_countries_menu();
+	
+		$this->load->library('form_validation');			
+		
+		$this->form_validation->set_rules("school", 'School Name', 'trim|required');
+		$this->form_validation->set_rules("major" , 'Major', 'trim|required');
+		$this->form_validation->set_rules("degree_level" , 'Degree Level', 'required');
+		$this->form_validation->set_rules("location" , 'Location', 'required');
+		$this->form_validation->set_rules("id_country" , 'Country', 'required');
+	
+		$this->form_validation->set_rules("start_month" , 'Start Month', 'required');
+		$this->form_validation->set_rules("start_year" , 'Start Year', 'required');
+		$this->form_validation->set_rules("end_month" , 'End Year', 'required');
+		$this->form_validation->set_rules("end_month" , 'End Year', 'required');
+		
+		$this->form_validation->set_rules("gpa" , 'GPA', 'required|numeric');
+	
+		$this->form_validation->set_rules("desc" , 'Description', 'required');
+	
+		if($education_id){
+			$data['education'] 				= $this->Customer_model->get_education_by_id_and_cid($education_id, $this->go_cart->customer('id'));							
+		}
+			
+		//You need pass a ID to this page, so check as well ID with member ID,
+		//if it is has a data in table. Let user do update
+		// if it is empty then just key in new.
+		if ($this->form_validation->run() == FALSE)
+		{
+			$this->view('jobseeker_education', $data);
+		}else{
+	
+			$school = $this->input->post('school');
+			$major = $this->input->post('major');
+			$degree_level = $this->input->post('degree_level');
+			$location = $this->input->post('location');
+			$id_country = $this->input->post('id_country');
+			$gpa = $this->input->post('gpa');
+						
+			$start_month = $this->input->post('start_month');
+			$start_year = $this->input->post('start_year');
+			$str_start_date = strtotime($start_month.$start_year);
+			$start_date = date("Y-m-d",$str_start_date);
+	
+			$end_month = $this->input->post('end_month');
+			$end_year = $this->input->post('end_year');
+			$str_end_date = strtotime($end_month.$end_year);
+			$end_date = date("Y-m-d",$str_end_date);
+			
+			$desc = $this->input->post('desc');				
+			
+			// Begin with i=1 because in HTML is start array with 1
+			// then all insert into array - array -> array				
+			$edu['school']			= $school;
+			$edu['major']			= $major;
+			$edu['degree_level']	= $degree_level;
+			$edu['gpa']				= $gpa;
+			$edu['id_country']		= $id_country;						
+			$edu['id_member'] 		= $this->go_cart->customer('id');
+			$edu['location'] 		= $location;
+			$edu['id_country'] 		= $id_country;
+			$edu['start_date'] 		= $start_date;
+			$edu['end_date'] 		= $end_date;
+			$edu['desc'] 			= $desc;
+	
+			if(!empty($data['education'])){
+				$edu['id'] 	= $data['education']->id;
+			}
+	
+			$id = $this->Customer_model->save_education($edu);
+	
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+	
+			redirect('cart/my_resume');
+		}
+	
+	}
+	
+	
+	
+	function post_resume()
+	{
+		$data['post_resume']		= true;
+		$data['customer']		= $this->go_cart->customer();
+		
+		
+		$this->view('my_resume', $data);
+	}
+	
+	function post_job()
+	{		
+		$data['post_job']			= true;
+		
+		$data['customer']		= $this->go_cart->customer();
+		$this->load->library('form_validation');
+
+		$data['id_country']		= '';
+		$data['id_state']		= '';
+									
+		$data['countries_menu']	= $this->Location_model->get_countries_menu();		
+		
+		$firstKey = 0;
+		$i = 0;
+		foreach($data['countries_menu'] as $key => $value){
+			if($i == 0){
+				$firstKey = $key;
+			}else{
+				break;
+			}	
+
+			$i++;
+		}
+		
+		
+		$data['zones_menu']	= $this->Location_model->get_zones_menu($firstKey);
+		
+		$this->form_validation->set_rules('job_title', 'Job Title', 'trim|required');
+		$this->form_validation->set_rules('job_category', 'Category', 'required');
+		$this->form_validation->set_rules('description', 'Description', 'required');
+		$this->form_validation->set_rules('id_country', 'Country', 'required');				
+		$this->form_validation->set_rules('id_state', 'State', 'required');
+		$this->form_validation->set_rules('city', 'City', 'required');
+		$this->form_validation->set_rules('zipcode', 'Zipcode', 'required');
+		$this->form_validation->set_rules('position_type', 'Position Type', 'required');
+		$this->form_validation->set_rules('min_edu', 'Minimum Education', 'required');
+				
+				
+		if ($this->form_validation->run() == FALSE)
+		{															
+			$this->view('post_job', $data);
+		}else{						
+			echo 'masuk true?';
+			$job['id_employer']								= $this->go_cart->customer('id');
+			$job['job_title']								= $this->input->post('job_title'); 
+			$job['job_category'] 							= $this->input->post('job_category'); 
+			$job['long_desc'] 								= $this->input->post('description'); 
+			$job['id_country'] 								= $this->input->post('id_country'); 
+			$job['id_state'] 								= $this->input->post('id_state'); 
+			$job['city'] 									= $this->input->post('city'); 
+			$job['zipcode'] 								= $this->input->post('zipcode'); 
+			$job['position_type'] 							= $this->input->post('position_type'); 
+			$job['min_edu'] 								= $this->input->post('min_edu');	
+			$job['active']									= 1;	
+												
+			//$this->Customer_model->save_batch_skill($skills);
+			$id = $this->Customer_model->save_employer_job($job);
+			
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+			
+			redirect('cart/job_posted/'.$job['job_title']);
+		}
+				
+	}
+	
+	function edit_job($id = 0, $test = '')
+	{		
+		if(!$id){
+			$id =  $this->input->post('id');						
+		}
+		$data['edit_job']			= true;	
+		$data['job'] 				= 	$this->Customer_model->get_job($id);				
+		$data['customer']			= 	$this->go_cart->customer();
+		$this->load->library('form_validation');
+	
+		$data['id_country']		= '';
+		$data['id_state']		= '';
+			
+		$data['countries_menu']	= $this->Location_model->get_countries_menu();
+		
+		$firstKey = 0;
+		$i = 0;
+		foreach($data['countries_menu'] as $key => $value){
+			if($i == 0){
+				$firstKey = $key;
+			}else{
+				break;
+			}
+	
+			$i++;
+		}	
+	
+		$data['zones_menu']	= $this->Location_model->get_zones_menu($firstKey);
+	
+		$this->form_validation->set_rules('job_title', 'Job Title', 'trim|required');
+		$this->form_validation->set_rules('job_category', 'Category', 'required');
+		$this->form_validation->set_rules('description', 'Description', 'required');
+		$this->form_validation->set_rules('id_country', 'Country', 'required');
+		$this->form_validation->set_rules('id_state', 'State', 'required');
+		$this->form_validation->set_rules('city', 'City', 'required');
+		$this->form_validation->set_rules('zipcode', 'Zipcode', 'required');
+		$this->form_validation->set_rules('position_type', 'Position Type', 'required');
+		$this->form_validation->set_rules('min_edu', 'Minimum Education', 'required');	
+		$this->form_validation->set_rules('experience', 'Experience', 'required|numeric');
+		$this->form_validation->set_rules('salary', 'Approximate Salary', 'required|numeric');
+	
+		if ($this->form_validation->run() == FALSE)
+		{
+			$this->view('edit_job', $data);
+		}else{					
+			$job['id']										= $id;
+			$job['id_employer']								= $this->go_cart->customer('id');
+			$job['job_title']								= $this->input->post('job_title');
+			$job['job_category'] 							= $this->input->post('job_category');
+			$job['long_desc'] 								= $this->input->post('description');
+			$job['id_country'] 								= $this->input->post('id_country');
+			$job['id_state'] 								= $this->input->post('id_state');
+			$job['city'] 									= $this->input->post('city');
+			$job['zipcode'] 								= $this->input->post('zipcode');
+			$job['position_type'] 							= $this->input->post('position_type');
+			$job['min_edu'] 								= $this->input->post('min_edu');
+			$job['min_exp'] 								= $this->input->post('experience');
+			$job['approximate_salary'] 						= $this->input->post('salary');
+	
+			//$this->Customer_model->save_batch_skill($skills);
+			$id = $this->Customer_model->save_employer_job($job);
+				
+			$this->session->set_flashdata('message', lang('message_account_updated'));
+				
+			redirect('cart/job_posted/'.$job['job_title']);
+		}
+	
+	}
+	
+	function contact_us()
+	{
+		$data['contact_us']			= true;
+	
+		$this->view('contact_us', $data);
+	}	
+	
+	function job_search(){
+		$data['job_search']				= true;
+		$data['customer']				= $this->go_cart->customer();
+		
+		$order_by="epj.id"; 
+		$sort_order="DESC"; 
+		$code=0; 
+		$page=0; 
+		$rows=15;
+				
+		$job_title 						= $this->input->post('job_title');
+		$location 						= $this->input->post('location');
+		$experience 					= $this->input->post('experience');
+		$salary 						= $this->input->post('salary');				
+				
+		//store the search location
+		$data['location']				= $location;
+				
+		$data['all_jobs']					= $this->Customer_model->jobs_search(array('job_title'=>$job_title, 'location'=>$location, 'experience'=>$experience, 'salary'=>$salary , 'order_by'=>$order_by, 'sort_order'=>$sort_order, 'rows'=>$rows, 'page'=>$page));				
+		$data['top_jobs']					= $this->Customer_model->retrieve_jobs();
+		//$data['all_jobs'] 				= $this->Customer_model->jobs_search();					
+				
+		$this->view('job_listing', $data);
+	}
+	
+	function job_detail($dummy_data = false, $id = false)
+	{		
+		$data['job_detail']			= true;
+		$data['job'] = $this->Customer_model->get_job($id);
+		$data['employer'] = $this->Customer_model->get_member($data['job']->id_employer);		
+		$data['all_jobs'] 			= $this->Customer_model->retrieve_jobs();
+	
+		$this->view('job_detail', $data);
+	}
+	
+	function about_us()
+	{
+		$data['about_us']			= true;
+	
+		$this->view('about_us', $data);
+	}
+	
+	function short_code()
+	{
+		$data['short_code']			= true;		
+		$this->view('short_code', $data);
+	}
+	
+	function company_logo_upload(){
+		$data['logo_upload']		= true;		
+		$this->view('logo_upload', $data);
+	}
+	
+	function upload_resume(){
+		$data['upload_resume']		= true;
+		$this->view('upload_resume', $data);
+	}
+	
+	function process_upload(){
+		
+		// load other page content
+		$this->load->helper('directory');
+		
+		if(isset($_FILES["FileInput"]) && $_FILES["FileInput"]["error"]== UPLOAD_ERR_OK)
+		{
+			############ Edit settings ##############
+			//$UploadDirectory	= 'F:/Websites/file_upload/uploads/'; //specify upload directory ends with / (slash)
+			$config['upload_path']		= 'uploads';
+			
+			if (empty($_POST['resume']))
+			{
+				$config['allowed_types'] 	= 'gif|jpg|png';
+			}else{
+				$config['allowed_types'] 	= 'doc|txt|pdf';
+			}
+			
+			
+			//$config['allowed_types'] 	= 'gif|jpg|png|doc|txt';
+			$config['max_size'] 		= 1024 * 8;
+			$config['encrypt_name'] 	= TRUE;
+			$config['overwrite'] 		= TRUE; //overwrite user avatar
+			
+			$this->load->library('upload', $config);
+			##########################################
+		
+			/*
+			 Note : You will run into errors or blank page if "memory_limit" or "upload_max_filesize" is set to low in "php.ini".
+			 Open "php.ini" file, and search for "memory_limit" or "upload_max_filesize" limit
+			 and set them adequately, also check "post_max_size".
+			 */
+		
+			//check if this is an ajax request
+			if (!isset($_SERVER['HTTP_X_REQUESTED_WITH'])){
+				die('this is httpx');
+			}
+			
+			//Is file size is less than allowed size.
+			if ($_FILES["FileInput"]["size"] > 5242880) {
+				die("File size is too big!");
+			}
+		
+			//allowed file type Server side check
+			switch(strtolower($_FILES['FileInput']['type']))
+			{
+				//allowed file types
+				case 'image/png':
+				case 'image/gif':
+				case 'image/jpeg':
+				case 'image/pjpeg':
+				case 'text/plain':
+				case 'text/html': //html file
+				case 'application/x-zip-compressed':
+				case 'application/pdf':
+				case 'application/msword':
+				case 'application/vnd.ms-excel':
+				case 'video/mp4':
+					break;
+				default:
+					die('Unsupported File!'); //output error
+			}
+			
+			$File_Name          = strtolower($_FILES['FileInput']['name']);
+			$File_Ext           = substr($File_Name, strrpos($File_Name, '.')); //get file extention
+			$Random_Number      = rand(0, 9999999999); //Random number to be added to name.
+			$NewFileName 		= $Random_Number.$File_Ext; //new file name
+		
+			$file_element_name = 'FileInput';
+				
+			if (!$this->upload->do_upload($file_element_name))
+			{
+				/* $status = 'error';
+				 $msg = $this->upload->display_errors('', ''); */
+				die('error macam empty!');
+			}else{
+				$data = $this->upload->data();				
+				
+				
+				if (empty($_POST['resume']))
+				{
+					$today = date("YmdHis").'-logo';
+					$member['id'] 		= $this->go_cart->customer('id');
+					$member['logo'] 	= $data['file_name'];
+					
+					//update member table to keep track
+					$this->Customer_model->save_members($member);
+					$file_id = $this->Customer_model->insert_file($data['file_name'], $today);
+					if($file_id)
+					{
+						/* $status = "success";
+						 $msg = "File successfully uploaded"; */
+						//echo "<img src='". base_url('uploads/'.$data['file_name']) ."' class='company-logo'>";
+						//echo $data['file_name']
+						//die('File successfully uploaded');
+						echo '<div class="step-by-inner-img2"><img src='.base_url('uploads/'.$data['file_name']).' alt="Company Logo" class="company-logo" style="width:280px; height:180px;"/></div>';
+					
+					}
+					else
+					{
+						unlink($data['full_path']);
+						/* $status = "error";
+						 $msg = "Something went wrong when saving the file, please try again."; */
+						die('Something went wrong when saving the file, please try again.');
+					}
+				}else{
+					$today = date("YmdHis");
+					$member['id'] 		= $this->go_cart->customer('id');
+					$member['resume'] 	= $data['file_name'];
+					
+					//update member table to keep track
+					$this->Customer_model->save_members($member);
+					$file_id = $this->Customer_model->insert_file($data['file_name'], $today);
+					if($file_id)
+					{
+						/* $status = "success";
+						 $msg = "File successfully uploaded"; */
+						//echo "<img src='". base_url('uploads/'.$data['file_name']) ."' class='company-logo'>";
+						//echo $data['file_name']
+						//die('File successfully uploaded');
+						//echo '<div class="step-by-inner-img2"><img src='.base_url('uploads/'.$data['file_name']).' alt="Company Logo" class="company-logo" style="width:280px; height:180px;"/></div>';
+						echo '<a href="'. base_url('uploads/'.$data['file_name']).'">'.$data['file_name'].'</a>';						
+						
+						
+						//redirect('cart/my_resume/');
+					}
+					else
+					{
+						unlink($data['full_path']);
+						/* $status = "error";
+						 $msg = "Something went wrong when saving the file, please try again."; */
+						die('Something went wrong when saving the file, please try again.');
+					}
+				}
+				
+				
+				
+			}
+			@unlink($_FILES[$file_element_name]);
+			/* if(move_uploaded_file($_FILES['FileInput']['tmp_name'], $UploadDirectory.$NewFileName ))
+			{
+				die('Success! File Uploaded.');
+			}else{
+				die('error uploading File!');
+			} */
+			
+		}
+		else
+		{
+			die('Something wrong with upload! Is "upload_max_filesize" set correctly?');
+		}
+	}
+	
+	function job_posted($job_title = '', $job_test = ''){
+		
+		echo $job_test;
+		$data['job_posted']			= true;		
+		$data['job_title']			= $job_title;		
+		
+		$this->view('job_posted', $data);
+	}
+	
+	function manage_job(){
+		$data['manage']				= true;
+		$data['customer']			= $this->go_cart->customer();		
+		$data['jobs'] = $this->Customer_model->get_all_jobs($this->go_cart->customer('id'));				
+		
+		$this->view('manage_job', $data);
+	}
+	
+	 
+
+	
+}

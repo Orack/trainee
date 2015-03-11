@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title><?php echo (!empty($seo_title)) ? $seo_title .' - ' : ''; echo $this->config->item('company_name'); ?></title>
+
+
+<?php if(isset($meta)):?>
+	<?php echo $meta;?>
+<?php else:?>
+<meta name="Keywords" content="Trainee, Orack Software Solution, Fresh Graduate, Job Seeker, Employer, Job Board Malaysia">
+<meta name="Description" content="Trainee is a jobs board provide needed for who looking for job and employer as a niche to post their job title for pertinent job seeker.">
+<?php endif;?>
+
+
+<!-- Bootstrap -->
+<?php echo bootstrap_css('bootstrap.min.css', true);?>
+<!-- Bootstrap -->
+
+<!-- Main Style -->
+<?php echo theme_css('style.css', true);?>
+<!-- Main Style -->
+
+<!-- fonts -->
+<link href='http://fonts.googleapis.com/css?family=Nunito:300,400,700' rel='stylesheet' type='text/css'>
+<link href='http://fonts.googleapis.com/css?family=Raleway:400,300,500,600,700' rel='stylesheet' type='text/css'>
+<?php echo font_css('font-awesome.css', true);?>
+<!-- fonts -->
+
+<!-- Owl Carousel -->
+<?php echo theme_css('owl.carousel.css', true);?>
+<?php echo theme_css('owl.theme.css', true);?>
+<?php echo theme_css('owl.transitions.css', true);?>
+<!-- Owl Carousel -->
+
+<!-- Form Slider -->
+<?php echo theme_css('jslider.css', true);?>
+<?php echo theme_css('jslider.round.css', true);?>	
+<!-- Form Slider -->
+
+
+<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+<!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+<![endif]-->
+
+
+<?php
+//with this I can put header data in the header instead of in the body.
+if(isset($additional_header_info))
+{
+	echo $additional_header_info;
+}
+
+?>
+</head>
+
+<body>
+	<div id="wrapper"><!-- start main wrapper -->
+	<div id="header"><!-- start main header -->
+			<div class="top-line">&nbsp;</div>
+			<div class="top"><!-- top -->
+				<div class="container">
+					<div class="media-top-right">
+						<ul class="media-top clearfix">
+							<li class="item"><a href="" target="blank"><i class="fa fa-twitter"></i></a></li>
+							<li class="item"><a href="" target="blank"><i class="fa fa-facebook"></i></a></li>
+							<li class="item"><a href="" target="blank"><i class="fa fa-linkedin"></i></a></li>
+							<li class="item"><a href="" target="blank"><i class="fa fa-rss"></i></a></li>
+							<li class="item"><a href="" target="blank"><i class="fa fa-google-plus"></i></a></li>
+						</ul>
+						<ul class="media-top-2 clearfix">
+							<li><a href="<?php echo site_url('secure/register')?>" class="btn btn-default btn-blue btn-sm">REGISTER</a></li>
+							<li><a href="<?php echo site_url('secure/login')?>" class="btn btn-default btn-green btn-sm" >LOG IN</a></li>
+						</ul>
+						<div class="clearfix"></div>
+					</div>
+				</div>
+			</div><!-- top -->
+			<div class="container"><!-- container -->
+				<div class="row">
+					<div class="col-md-4"><!-- logo -->
+						<a href="<?php echo site_url()?>" title="Job Board" rel="home">
+							<img class="main-logo" src="<?php echo theme_img('logo.png')?>" alt="job board" />
+						</a>
+					</div><!-- logo -->
+					<div class="col-md-8 main-nav"><!-- Main Navigation -->
+						<a id="touch-menu" class="mobile-menu" href="#"><i class="fa fa-bars fa-2x"></i></a>
+						<nav>
+							<ul class="menu">
+								<li><a href="<?php echo site_url()?>">HOME</a>
+									<ul class="sub-menu">
+										<li><a href="<?php echo site_url('about_us')?>">About Page</a></li>
+										<li><a href="<?php echo site_url('job_detail')?>">Single Job Page</a></li>
+										<li><a href="<?php echo site_url('job_listing')?>">Job Listing</a></li>
+										<li><a href="<?php echo site_url('contact_us')?>">Contact</a></li>									
+										<li><a href="<?php echo site_url('secure/register_employers')?>">Employers</a></li>
+										
+									</ul>
+								</li>
+								<li><a  href="#">JOB SEARCH</a></li>
+								<li><a  href="<?php echo site_url('post_job');?>">POST A JOB</a></li>
+								<li><a  href="<?php echo site_url('post_resume');?> ">POST A RESUME</a></li>								
+								<li><a  href="<?php echo site_url('short_code');?>">SHORTCODE</a></li>
+							</ul>
+						</nav>
+					</div><!-- Main Navigation -->
+					<div class="clearfix"></div>
+				</div>
+			</div><!-- container -->
+	</div><!-- end main header -->
+		
+		
+
+<?php
+/*
+End header.php file
+*/
